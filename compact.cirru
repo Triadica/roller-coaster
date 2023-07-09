@@ -9,27 +9,28 @@
         |comp-container $ quote
           defn comp-container (store)
             group nil (comp-ground)
-              comp-cubes $ {} (:size 400)
+              comp-cubes $ {} (:size 1000)
         |comp-cubes $ quote
           defn comp-cubes (options)
             let
-                size $ either (:size options) 200
-                many 1000
+                size $ either (:size options) 400
+                h $ * size 20
+                many 2000
               object $ {} (:shader cube-wgsl)
                 :topology $ do :line-strip :triangle-list
                 :attrs-list $ [] (:: :float32x3 :position)
                 :data $ -> (range many)
                   map $ fn (idx)
                     let
-                        base $ rand-pos 40000
+                        base $ rand-pos 800000
                       []
                         :: :vertex $ v+ base ([] 0 0 0)
-                        :: :vertex $ v+ base ([] 0 size 0)
-                        :: :vertex $ v+ base ([] 0 size size)
+                        :: :vertex $ v+ base ([] 0 h 0)
+                        :: :vertex $ v+ base ([] 0 h size)
                         :: :vertex $ v+ base ([] 0 0 size)
                         :: :vertex $ v+ base ([] size 0 0)
-                        :: :vertex $ v+ base ([] size size 0)
-                        :: :vertex $ v+ base ([] size size size)
+                        :: :vertex $ v+ base ([] size h 0)
+                        :: :vertex $ v+ base ([] size h size)
                         :: :vertex $ v+ base ([] size 0 size)
                 :indices $ -> (range many)
                   map $ fn (idx)
@@ -41,15 +42,15 @@
         |comp-ground $ quote
           defn comp-ground () $ let
               y -10
-              unit 600
+              unit 1800
             object $ {} (:shader ground-wgsl)
               :topology $ do :line-strip :triangle-list
               :attrs-list $ [] (:: :float32x3 :position)
-              :data $ -> (range-bothway 50)
+              :data $ -> (range-bothway 100)
                 map $ fn (i)
                   let
                       i+1 $ inc i
-                    -> (range-bothway 50)
+                    -> (range-bothway 100)
                       map $ fn (j)
                         let
                             j+1 $ inc j
@@ -65,7 +66,7 @@
             v-scale
               []
                 - (js/Math.random) 0.5
-                js/Math.random
+                * 0.1 $ - (js/Math.random) 0.2
                 - (js/Math.random) 0.5
               , n
       :ns $ quote
@@ -119,10 +120,12 @@
             add-watch *store :change $ fn (next store) (render-app!)
             setupMouseEvents canvas
             if remote-control? $ setupRemoteControl
+            setup-roll!
         |reload! $ quote
           defn reload! () $ if (nil? build-errors)
             do (reset-memof1-caches!) (render-app!) (remove-watch *store :change)
               add-watch *store :change $ fn (next store) (render-app!)
+              setup-roll!
               println "\"Reloaded."
               hud! "\"ok~" "\"OK"
             hud! "\"error" build-errors
@@ -130,6 +133,8 @@
           defn render-app! () $ let
               tree $ comp-container @*store
             renderLagopusTree tree dispatch!
+        |setup-roll! $ quote
+          defn setup-roll! () (set! js/window.roll roll!) (roll!)
       :ns $ quote
         ns app.main $ :require
           app.comp.container :refer $ comp-container
@@ -143,3 +148,64 @@
           lagopus.cursor :refer $ update-states
           lagopus.config :refer $ bg-color
           "\"@triadica/lagopus/lib/remote-control.mjs" :refer $ setupRemoteControl
+          app.path :refer $ roll!
+    |app.path $ {}
+      :defs $ {}
+        |roll! $ quote
+          defn roll! () (; roll-helix! 0) (roll-cycloid! 0)
+        |roll-cycloid! $ quote
+          defn roll-cycloid! (t)
+            when (< t 200000)
+              js/requestAnimationFrame $ fn (d)
+                let
+                    dt $ * d 0.001
+                    next $ + t dt
+                    df $ * dt 2000
+                    da $ * 0.3 dt
+                    r 100
+                    p $ []
+                      -
+                        + df $ * r (sin da)
+                        , 40000
+                      + 3000 $ - r
+                        * r $ cos da
+                      , 0
+                    front $ [] (cos da) (sin da) 0
+                    right $ [] 0 0 1
+                    up $ []
+                      negate $ sin da
+                      cos da
+                      , 0
+                  .!reset atomViewerForward $ js-array & front
+                  .!reset atomViewerPosition $ js-array & p
+                  .!reset atomViewerUpward $ js-array & up
+                  paintLagopusTree
+                  ; js/console.log t
+                  roll-cycloid! next
+        |roll-helix! $ quote
+          defn roll-helix! (t)
+            when (< t 40000)
+              js/requestAnimationFrame $ fn (d)
+                let
+                    dt $ * d 0.001
+                    next $ + t dt
+                    df $ * dt 10000
+                    da $ * 0.8 dt
+                    r 10000
+                    p $ [] (- df 200000)
+                      + 10000 $ * r (cos da)
+                      * r $ sin da
+                    front $ [] 1 0 0
+                    up $ [] 0
+                      negate $ cos da
+                      negate $ sin da
+                  .!reset atomViewerForward $ js-array & front
+                  .!reset atomViewerPosition $ js-array & p
+                  .!reset atomViewerUpward $ js-array & up
+                  paintLagopusTree
+                  ; js/console.log t
+                  roll-helix! next
+      :ns $ quote
+        ns app.path $ :require
+          "\"@triadica/lagopus" :refer $ paintLagopusTree
+          "\"@triadica/lagopus/lib/perspective.mjs" :refer $ atomViewerForward atomViewerPosition atomViewerUpward
