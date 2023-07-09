@@ -42,7 +42,8 @@ fn vertex_main(
 @fragment
 fn fragment_main(vtx_out: VertexOut) -> @location(0) vec4f {
   let p = vtx_out.original;
-  let a = 0.001;
+  /// tricky number to make lines aligned
+  let a = 0.000554;
   if (fract(p.x * a) < 0.02) {
     return vec4(1., 1., 1., 1.);
   }

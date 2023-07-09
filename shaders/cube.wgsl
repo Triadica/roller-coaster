@@ -52,6 +52,6 @@ fn fragment_main(vtx_out: VertexOut) -> @location(0) vec4f {
   // if (far) {
   //   return vec4f(1.0, 1.0, 1.0, 1.0);
   // } else {
-    return vec4f(0.6, 0.6, 0.6, 1.0);
+    return vec4(0.6, 0.6, 0.6, 1.0);
   // }
 }

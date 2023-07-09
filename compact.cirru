@@ -152,7 +152,7 @@
     |app.path $ {}
       :defs $ {}
         |roll! $ quote
-          defn roll! () (; roll-helix! 0) (roll-cycloid! 0)
+          defn roll! () (roll-helix! 0) (; roll-cycloid! 0)
         |roll-cycloid! $ quote
           defn roll-cycloid! (t)
             when (< t 200000)
