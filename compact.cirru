@@ -10,6 +10,13 @@
           defn comp-container (store)
             group nil (comp-ground)
               comp-cubes $ {} (:size 1000)
+              comp-polylines $ {}
+                :writer $ fn (write!)
+                  -> (range 10000)
+                    map $ fn (idx)
+                      write! $ :: :vertex
+                        helix-calc-position $ * 0.1 idx
+                        , 200
         |comp-cubes $ quote
           defn comp-cubes (options)
             let
@@ -74,9 +81,10 @@
           lagopus.alias :refer $ group object
           "\"../shaders/cube.wgsl" :default cube-wgsl
           "\"../shaders/ground.wgsl" :default ground-wgsl
-          lagopus.comp.curves :refer $ comp-curves
+          lagopus.comp.curves :refer $ comp-curves comp-polylines
           memof.once :refer $ memof1-call
           quaternion.core :refer $ c+ v+ v-scale
+          app.path :refer $ helix-calc-position
     |app.config $ {}
       :defs $ {}
         |dev? $ quote
@@ -134,7 +142,9 @@
               tree $ comp-container @*store
             renderLagopusTree tree dispatch!
         |setup-roll! $ quote
-          defn setup-roll! () (set! js/window.roll roll!) (roll!)
+          defn setup-roll! () (set! js/window.roll roll!)
+            if (some? js/window._raf) (js/cancelAnimationFrame js/window._raf)
+            roll!
       :ns $ quote
         ns app.main $ :require
           app.comp.container :refer $ comp-container
@@ -151,8 +161,19 @@
           app.path :refer $ roll!
     |app.path $ {}
       :defs $ {}
+        |helix-calc-position $ quote
+          defn helix-calc-position (time)
+            let
+                angle $ * 0.8 time
+                r 6000
+              []
+                - (* time 10000) 200000
+                + 10000 $ * r (cos angle)
+                * r $ sin angle
         |roll! $ quote
-          defn roll! () (roll-helix! 0) (; roll-cycloid! 0)
+          defn roll! ()
+            roll-helix! $ js/performance.now
+            ; roll-cycloid! 0
         |roll-cycloid! $ quote
           defn roll-cycloid! (t)
             when (< t 200000)
@@ -183,29 +204,33 @@
                   ; js/console.log t
                   roll-cycloid! next
         |roll-helix! $ quote
-          defn roll-helix! (t)
-            when (< t 40000)
-              js/requestAnimationFrame $ fn (d)
+          defn roll-helix! (t0)
+            set! js/window._raf $ js/requestAnimationFrame
+              fn (t)
                 let
+                    d $ - t t0
                     dt $ * d 0.001
-                    next $ + t dt
-                    df $ * dt 10000
-                    da $ * 0.8 dt
-                    r 10000
-                    p $ [] (- df 200000)
-                      + 10000 $ * r (cos da)
-                      * r $ sin da
-                    front $ [] 1 0 0
-                    up $ [] 0
-                      negate $ cos da
-                      negate $ sin da
+                    time dt
+                    p $ helix-calc-position time
+                    p-next $ helix-calc-position (+ time 0.02)
+                    front $ do
+                      v-normalize $ &v- p-next p
+                      ; [] 1 0 0
+                    up $ do
+                      v-normalize $ &v-
+                        []
+                          - (* time 10000) 200000
+                          , 10000 0
+                        , p
+                      ; [] 0 1 0
                   .!reset atomViewerForward $ js-array & front
                   .!reset atomViewerPosition $ js-array & p
                   .!reset atomViewerUpward $ js-array & up
                   paintLagopusTree
                   ; js/console.log t
-                  roll-helix! next
+                  if (< dt 40) (roll-helix! t0)
       :ns $ quote
         ns app.path $ :require
           "\"@triadica/lagopus" :refer $ paintLagopusTree
           "\"@triadica/lagopus/lib/perspective.mjs" :refer $ atomViewerForward atomViewerPosition atomViewerUpward
+          quaternion.core :refer $ &v- v-normalize
